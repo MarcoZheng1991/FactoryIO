@@ -1,0 +1,120 @@
+﻿FUNCTION "Sorting by weight" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+	IF "Start_PB" THEN
+	    "MainConveyor" := TRUE;
+	    "LeftConveyor" := TRUE;
+	    "MiddleConveyor" := TRUE;
+	    "RightConveyor" := TRUE;
+	
+	END_IF;
+	
+	
+	"IEC_Timer_0_DB".TOF(IN:=NOT "Stop_Sensor",
+	                     PT:=T#1S);
+	"F_TRIG_DB"(CLK:="IEC_Timer_0_DB".Q);
+	
+	"IEC_Timer_0_DB_1".TOF(IN:=NOT "Stop_Sensor",
+	                       PT:=T#3S);
+	"F_TRIG_DB_1"(CLK:="IEC_Timer_0_DB_1".Q);
+	
+	
+	IF "F_TRIG_DB".Q THEN
+	    "ConveyorScale" := FALSE;
+	ELSIF NOT "Stop_Sensor" THEN
+	    "ConveyorScale" := TRUE;
+	ELSIF "F_TRIG_DB_1".Q THEN
+	    "ConveyorScale" := TRUE;
+	END_IF;
+	
+	
+	// Scaling of weight
+	"Actual Weight":="ConveyorScaleWight"*2.0;
+	
+	
+	//compare weight and respective data register
+	IF NOT "ConveyorScale" AND "Actual Weight" >= 8.0 AND "Actual Weight" <= 8.2 THEN
+	    "SortBIT" := 1;
+	ELSIF NOT "ConveyorScale" AND "Actual Weight" >= 10.0 AND "Actual Weight" <= 10.2 THEN
+	    "SortBIT" := 2;
+	ELSIF NOT "ConveyorScale" AND "Actual Weight" > 15.0   THEN
+	    "SortBIT" := 3;
+	END_IF;
+	
+	
+	// sort forward 10kg box
+	IF "SortBIT"=2 THEN
+	    "SortForword" := true;
+	END_IF;
+	
+	// Reset forward sorting
+	IF NOT "ExitSensorMiddle" THEN
+	    "SortForword" := FALSE;
+	    "SortLeft" := FALSE;
+	    "SortRight" := FALSE;
+	    "SortBIT" := 0;
+	    "ConveyorScale" := FALSE;
+	END_IF;
+	
+	
+	// sort left 8kg box
+	IF "SortBIT" = 1 THEN
+	    "SortForword" := true;
+	    "SortLeft" := true;
+	END_IF;
+	
+	//reset left sorting
+	IF NOT "ExitSensorLeft" THEN
+	    "SortForword" := FALSE;
+	    "SortLeft" := FALSE;
+	    "SortRight" := FALSE;
+	    "SortBIT" := 0;
+	    "ConveyorScale" := 0;
+	END_IF;
+	
+	
+	// Sort right 15kg box
+	IF "SortBIT" = 3 THEN
+	    "SortForword" := true;
+	    "SortRight" := true;
+	END_IF;
+	
+	//reset right sorting 
+	IF NOT "ExitSensorRight" THEN
+	    "SortForword" := FALSE;
+	    "SortLeft" := FALSE;
+	    "SortRight" := FALSE;
+	    "SortBIT" := 0;
+	    "ConveyorScale" := 0;
+	END_IF;
+	
+	
+	// RESET ALL OUTPUT, MEMORY BIT , AND DATA REGISTER
+	IF "Reset_PB" THEN
+	    "Tag_3" := 0;
+	    "Actual Weight" := 0;
+	    "SortBIT" := 0;
+	END_IF;
+	
+	// counting box
+	"IEC_Counter_0_DB".CTU(CU:="ExitSensorLeft",
+	                       PV:=100,
+	                       CV=>"8KG_BoxCounter");
+	
+	"IEC_Counter_0_DB_1".CTU(CU:="ExitSensorMiddle",
+	                         PV:=100,
+	                         CV=>"10KG_BoxCounter");
+	
+	"IEC_Counter_0_DB_2".CTU(CU:="ExitSensorRight",
+	                         PV:=100,
+	                         CV=>"15KG_BoxCounter");
+	
+	
+	
+	
+	
+	
+END_FUNCTION
+
